@@ -21,6 +21,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const Net = __importStar(require("net"));
 const ReadLine = __importStar(require("readline"));
+const socket_io_1 = require("socket.io");
 const readline = ReadLine.createInterface({
     input: process.stdin,
     output: process.stdout
@@ -28,6 +29,14 @@ const readline = ReadLine.createInterface({
 let sockets = [];
 let clients = [];
 const Server = new Net.Server();
+const io = new socket_io_1.Server();
+io.listen(3000, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"],
+        allowedHeaders: ["Access-Control-Allow-Origin"]
+    }
+});
 Server.listen(80);
 Server.on("connection", (socket) => {
     console.log(socket.remoteAddress);
@@ -37,11 +46,15 @@ Server.on("connection", (socket) => {
     socket.on('data', (data) => {
         if (username) {
             writeAll(username + ": " + data.toString().trimEnd(), socket);
+            io.sockets.emit("msg", username + ": " + data.toString().trimEnd());
             socket.write("> ");
         }
         else {
             username = Login(socket, data.toString().trimEnd());
         }
+    });
+    socket.on('error', error => {
+        console.log("me regala un bocadisho?");
     });
     socket.on('close', (error) => {
         const index = sockets.indexOf(socket, 0);
@@ -51,11 +64,27 @@ Server.on("connection", (socket) => {
         writeAll("--[" + username + " leaved the session]--");
     });
 });
+Server.on('error', error => {
+    console.log("batileche y bocadillos para todos");
+});
+io.on('connection', (socket) => {
+    console.log("connected from web");
+    socket.on("msg", (msg) => {
+        writeAll(msg);
+        io.sockets.emit("msg", msg);
+    });
+});
 function Login(socket, username) {
-    socket.write("logged as " + username + "\n");
-    writeAll("--[" + username + " joined the session]--", socket);
-    sockets.push(socket);
-    return username;
+    if (!(username in clients)) {
+        socket.write("logged as " + username + "\n");
+        writeAll("--[" + username + " joined the session]--", socket);
+        sockets.push(socket);
+        clients.push(username);
+        return username;
+    }
+    else {
+        return "";
+    }
 }
 function writeAll(text, exception) {
     sockets.forEach(socket => {
